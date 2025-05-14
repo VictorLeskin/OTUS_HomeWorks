@@ -8,12 +8,12 @@ class IoC
 {
 public:
 	template< typename T, typename... Args>
-	T* Resolve(std::string& s, Args... args);
+	T* Resolve(std::string s, Args... args);
 };
 
 
 template<typename T, typename ...Args>
-inline T* IoC::Resolve(std::string& s, Args ...args)
+inline T* IoC::Resolve(std::string s, Args ...args)
 {
 	return new T( args... );
 }
