@@ -62,3 +62,15 @@ TEST_F(test_IoC, test_ConvertFunctionPointer )
   EXPECT_EQ( 4, (callFunction<int, double, int>(function, 1, 3)) );
   EXPECT_EQ( 4, (callFunction<int>(function, 1.0, 3)) );
 }
+
+
+template <int I, class... Ts>
+decltype(auto) get_bbbb(Ts&&... ts) {
+    return std::get<I>(std::forward_as_tuple(ts...));
+}
+
+TEST_F(test_IoC, test_fffff)
+{
+    auto m = get_bbbb<1>(1.0, 2, "abd");
+    EXPECT_EQ(2, m );
+}
