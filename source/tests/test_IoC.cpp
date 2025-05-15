@@ -42,3 +42,23 @@ TEST_F(test_IoC, test_Resolve )
   EXPECT_EQ(sz, p->sz);
 }
 
+
+int f(double d, int x)
+{
+  return int( x + d );
+}
+
+// helper to convert function pointer as void * to real function 
+template<typename T, typename... Args>
+T callFunction(void* function, const Args&... args)
+{
+  return reinterpret_cast<T(*)(Args...)>(function)(args...);
+}
+
+TEST_F(test_IoC, test_ConvertFunctionPointer )
+{
+  void* function = reinterpret_cast<void*>(&f);
+
+  EXPECT_EQ( 4, (callFunction<int, double, int>(function, 1, 3)) );
+  EXPECT_EQ( 4, (callFunction<int>(function, 1.0, 3)) );
+}
