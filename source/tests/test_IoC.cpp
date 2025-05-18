@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "ioc.hpp"
+#include <optional>
 
 // clang-format off
 
@@ -15,9 +16,18 @@ public:
     {
     public:
         Test_Obj(int i, const char* sz) : i(i), sz(sz) {}
+        Test_Obj(double d) : d(d) {}
+        Test_Obj(char c) : c(c) {}
 
-        int i;
-        const char* sz;
+        static Test_Obj *CreateA(char c)
+        {
+            return new Test_Obj(c);
+        }
+
+        std::optional<int> i;
+        std::optional<const char*> sz;
+        std::optional<double> d;
+        std::optional<char> c;
     };
 
 
@@ -29,18 +39,172 @@ public:
     using IoC::IoC; // delegate constructors
   };
 
+  class TestOfConcept_Command : public iCommand
+  {
+  public:
+      TestOfConcept_Command(std::ostringstream& strm, const char* what) : strm( &strm), what(what)
+      {
+      }
+
+      void Execute() override
+      {
+          *strm << "Executing:" << what << std::endl;
+      }
+
+      std::ostringstream *strm;
+      const char* what;
+  };
+
+  class TestOfConcept_IoC
+  {
+  protected:
+       // just register a whole factory for the scope
+      iCommand *doRegister(const std::string& scope, const cFactory&f)
+      {
+          strm << "doRegister," << scope << "," << reinterpret_cast<int>(&f) << std::endl;
+          return nullptr;
+      }
+
+      // just register a factory method for the scope
+      template< typename T, typename... Args>
+      iCommand* doRegister(const std::string& scope, const std::string& nameFactoryMethod, T *(*f)(Args... args) )
+      {
+          strm << "doRegister," << scope << "," << nameFactoryMethod << "," << reinterpret_cast<int>(f) << std::endl;
+          assert(false);
+          return nullptr;
+      }
+
+      // just register a factory method for the scope
+      template< typename T, typename... Args>
+      iCommand* doRegister(const std::string& scope, const char* nameFactoryMethod, T* (*f)(Args... args))
+      {
+          strm << "doRegister," << scope << "," << nameFactoryMethod << "," << reinterpret_cast<int>(f) << std::endl;
+          assert(false);
+          return nullptr;
+      }
+
+
+      // alloed only two above methond to register generators 
+      template< typename T, typename... Args>
+      iCommand* doRegister(const std::string& s, Args... args)
+      {
+          throw std::exception("Bad generator.");
+          return nullptr;
+      }
+
+      template< typename T, typename... Args>
+      T *doResolve(const std::string &scope, const std::string &nameFactoryMethod, Args... args)
+      {
+          // looking for factory
+          // looking for factory method
+          assert(false);
+          return nullptr;
+      }
+
+  public:
+      template< typename T, typename... Args>
+      T* Resolve(std::string s1, std::string s2, Args... args)
+      {
+          if (s1 == "Register")
+              return doRegister<iCommand>(s2, std::forward<Args>(args)...);
+          else
+              return doResolve<T>(s1, s2, std::forward<Args>(args)...);
+
+          return nullptr;
+      }
+
+  public:
+      std::ostringstream strm;
+  };
 };
- 
-TEST_F(test_IoC, test_Resolve )
+
+TEST_F(test_IoC, test_ProofOfConcept)
 {
-  Test_IoC t;
-  const char* sz = "Amazing";
 
-  Test_Obj* p = t.Resolve<Test_Obj>(std::string("Test_Obj"), 2, sz );
+    {
+        TestOfConcept_IoC t;
+        cFactory* a = (cFactory*)(112);
 
-  EXPECT_EQ(2, p->i);
-  EXPECT_EQ(sz, p->sz);
+        t.Resolve<iCommand>("Register", "Scope1", a)->Execute();
+
+        std::string res = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
+        EXPECT_EQ(res, t.strm.str());
+    }
+
+    return;
+    
+    {
+        using fptr = int(*)(const char c);
+        TestOfConcept_IoC t;
+        fptr a = reinterpret_cast<fptr>(789);
+
+        t.Resolve<iCommand>( std::string( "Register" ), std::string("Scope1"), std::string("Object Name"), a)->Execute();
+
+        std::string res = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
+        EXPECT_EQ(res, t.strm.str());
+
+        //auto sum = [](double a, double b)
+        //{
+        //        return a + b;
+        //};
+        //
+        //t.Resolve<iCommand>("Register", "Scope1", "Object Name", sum)->Execute();
+        //
+        //std::string res1 = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
+        //EXPECT_EQ(res1, t.strm.str());
+
+    }
+
+    return;
+
+
+    {
+        TestOfConcept_IoC t;
+        cFactory* a = (cFactory*)(112);
+
+        t.Resolve<iCommand>("Register", "Scope1", 88)->Execute();
+
+        std::string res = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
+        EXPECT_EQ(res, t.strm.str());
+    }
+
+    
+    
+    //{
+    //    TestOfConcept_IoC t;
+    //
+    //    std::shared_ptr<Test_Obj> m = t.Resolve<Test_Obj>("Scope1", "Test_ObjName", 2, "ab");
+    //    std::string res = "doResolve,Scope1,Test_ObjName\n";
+    //    EXPECT_EQ(res, t.strm.str());
+    //}
+
 }
+ 
+//TEST_F(test_IoC, test_Resolve )
+//{
+//  Test_IoC t;
+//  const char* sz = "Amazing";
+//
+//  auto p = t.Resolve<Test_Obj>(std::string("Test_Obj"), 2, sz );
+//
+//  EXPECT_EQ(true, p->i.has_value() ); EXPECT_EQ(2, p->i);
+//  EXPECT_EQ(true, p->sz.has_value()); EXPECT_EQ(sz, p->sz);
+//  EXPECT_EQ(false, p->d.has_value()); 
+//
+//  auto q = t.Resolve<Test_Obj>(std::string("Test_Obj"), 232.0 );
+//  EXPECT_EQ(false, q->i.has_value()); 
+//  EXPECT_EQ(false, q->sz.has_value()); 
+//  EXPECT_EQ(true, q->d.has_value());EXPECT_EQ(232.0, q->d);
+//}
+//
+//TEST_F(test_IoC, test_Resolve_With_Register)
+//{
+//    Test_IoC t;
+//    const char* sz = "Amazing";
+//
+//    auto p = t.Resolve<Test_Obj>(std::string("Register"), std::string("Test_Obj"), Test_Obj::CreateA);
+//}
+
 
 
 int f(double d, int x)
