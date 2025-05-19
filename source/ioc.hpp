@@ -24,7 +24,11 @@ public:
 	virtual void Execute() = 0;
 
 };
-class cFactory;
+class cFactory
+{
+
+
+};
 
 class IoC
 {

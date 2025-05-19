@@ -57,6 +57,7 @@ public:
 
   class TestOfConcept_IoC
   {
+#if 0
   protected:
        // just register a whole factory for the scope
       //iCommand *doRegister(const std::string& scope, const cFactory&f)
@@ -77,7 +78,10 @@ public:
       //    return nullptr;
       //}
 
-
+      iCommand* doRegister(const std::string& scope, const cFactory& f);
+      iCommand* doRegister(const std::string& scope, const cFactory* f);
+      iCommand* doRegister(const std::string& scope, cFactory& f);
+      iCommand* doRegister(const std::string& scope, cFactory* f);
 
       // just register a factory method for the scope
       template< typename T, typename ObjType, typename... Args>
@@ -88,10 +92,7 @@ public:
           return nullptr;
       }
 
-      //iCommand* doRegister(const std::string& scope, const cFactory& f);
-      iCommand* doRegister(const std::string& scope, const cFactory* f);
-      //iCommand* doRegister(const std::string& scope, cFactory& f);
-      //iCommand* doRegister(const std::string& scope, cFactory* f);
+
 
 
       //// just register a factory method for the scope
@@ -132,6 +133,84 @@ public:
           return nullptr;
       }
 
+      template< typename T>
+      iCommand* ttdoRegister(const std::string& scope, T& t)
+      {
+          return nullptr;
+      }
+
+      template<> iCommand* ttdoRegister(const std::string& scope, std::tuple<const cFactory*>& t);
+
+
+      template< typename R, typename T>
+      R* ttResolve(const std::string s1, const std::string s2, T&& t)
+      {
+          if (s1 == "Register")
+              return ttdoRegister<iCommand>(s2, t);
+          //else
+          //    return doResolve<T>(s1, s2, std::forward<Args>(args)...);
+
+          return nullptr;
+      }
+
+
+
+      //template< typename T, typename S1, typename S2, typename... Args>
+      //T* Resolve(S1 s1, S2 s2, Args... args)
+      //{
+      //    //return ssResolve<T>(std::string(s1), std::string(s2), std::forward<Args>(args)...);
+      //    return ttResolve<T>(std::string(s1), std::string(s2), std::make_tuple(std::forward<Args>(args)...) );
+      //}
+
+
+#endif
+
+      template< typename T, typename... Args>
+      iCommand* doRegisterFactoryMethod(const std::string& scope, const std::string& objName, T* (*)(Args... args))
+      {
+          return nullptr;
+      }
+      
+      template< typename T, typename... Args>
+      iCommand* doRegister(const std::string& scope, Args... args) 
+      { 
+          return doRegisterFactoryMethod( scope, std::forward<Args>(args)...);
+      }
+      
+      template<> iCommand* doRegister<iCommand,const cFactory&>(const std::string& scope, const cFactory& f) { return nullptr; }
+      template<> iCommand* doRegister<iCommand,const cFactory*>(const std::string& scope, const cFactory* f) { return nullptr; }
+      template<> iCommand* doRegister<iCommand, cFactory>(const std::string& scope, cFactory f) { return nullptr; }
+      template<> iCommand* doRegister<iCommand,cFactory&>(const std::string& scope, cFactory& f) { return nullptr; }
+      template<> iCommand* doRegister<iCommand,cFactory*>(const std::string& scope, cFactory* f) { return nullptr; }
+
+      template< typename T, typename... Args>
+      void *getMethod(const std::string &s1, const std::string &s2)
+      {
+          using f = T * (*)(Args...);
+          return (f)nullptr;
+      }
+        
+
+      template< typename T, typename... Args>
+      T* doResolve(const std::string s1, const std::string s2, Args... args)
+      {
+          auto method = getMethod<T, Args... >( s1, s2 );
+          using f = T * (*)(Args...);
+          return (*f(method))(args...);
+      }
+
+
+      template< typename T, typename... Args>
+      T* ssResolve( const std::string s1, const std::string s2, Args... args)
+      {
+          if (s1 == "Register")
+              return doRegister<iCommand>(s2, std::forward<Args>(args)...);
+          else
+              return doResolve<T>(s1, s2, std::forward<Args>(args)...);
+
+          return nullptr;
+      }
+
 
   public:
 
@@ -139,6 +218,7 @@ public:
       T* Resolve( S1 s1, S2 s2, Args... args)
       {
           return ssResolve<T>(std::string(s1), std::string(s2), std::forward<Args>(args)...);
+          //return ssResolve<T>(std::string(s1), std::string(s2), std::forward<Args>(args)...);
       }
 
 
@@ -150,16 +230,38 @@ public:
 
 TEST_F(test_IoC, test_ProofOfConcept)
 {
+    {
+        TestOfConcept_IoC t;
+        cFactory* a0 = (cFactory*)(112);
+        cFactory& a1 = *a0;
+        const cFactory* b0 = a0;
+        const cFactory &b1 = *b0;
 
-    //{
-    //    TestOfConcept_IoC t;
-    //    const cFactory* a = (const cFactory*)(112);
-    //
-    //    t.Resolve<iCommand>("Register", "Scope1", a)->Execute();
-    //
-    //    std::string res = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
-    //    EXPECT_EQ(res, t.strm.str());
-    //}
+        using fptrc = int* (*)(const char c);
+        fptrc c = reinterpret_cast<fptrc>(789);
+
+
+        t.Resolve<iCommand>("Register", "Scope1", a0)->Execute();
+        t.Resolve<iCommand>("Register", "Scope1", a1)->Execute();
+        t.Resolve<iCommand>("Register", "Scope1", b0)->Execute();
+        t.Resolve<iCommand>("Register", "Scope1", b1)->Execute();
+        t.Resolve<iCommand>("Register", "Scope1", "obj", c)->Execute();
+
+        std::string res = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
+        EXPECT_EQ(res, t.strm.str());
+    }
+
+
+
+    {
+        TestOfConcept_IoC t;
+        const cFactory* a = (const cFactory*)(112);
+    
+        t.Resolve<iCommand>("Register", "Scope1", a)->Execute();
+    
+        std::string res = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
+        EXPECT_EQ(res, t.strm.str());
+    }
     
     {
         using fptr = int*(*)(const char c);
