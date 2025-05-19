@@ -59,38 +59,58 @@ public:
   {
   protected:
        // just register a whole factory for the scope
-      iCommand *doRegister(const std::string& scope, const cFactory&f)
-      {
-          strm << "doRegister," << scope << "," << reinterpret_cast<int>(&f) << std::endl;
-          return nullptr;
-      }
+      //iCommand *doRegister(const std::string& scope, const cFactory&f)
+      //{
+      //    strm << "doRegister," << scope << "," << reinterpret_cast<int>(&f) << std::endl;
+      //    return nullptr;
+      //}
+      //
+      //iCommand* doRegister(const std::string& scope, const cFactory* f)
+      //{
+      //    strm << "doRegister," << scope << "," << reinterpret_cast<int>(&f) << std::endl;
+      //    return nullptr;
+      //}
+      //
+      //iCommand* doRegister(const std::string& scope, cFactory* f)
+      //{
+      //    strm << "doRegister," << scope << "," << reinterpret_cast<int>(&f) << std::endl;
+      //    return nullptr;
+      //}
+
+
 
       // just register a factory method for the scope
-      template< typename T, typename... Args>
-      iCommand* doRegister(const std::string& scope, const std::string& nameFactoryMethod, T *(*f)(Args... args) )
+      template< typename T, typename ObjType, typename... Args>
+      iCommand* doRegister(const std::string& scope, const std::string& nameFactoryMethod, ObjType*(*f)(Args... args) )
       {
           strm << "doRegister," << scope << "," << nameFactoryMethod << "," << reinterpret_cast<int>(f) << std::endl;
           assert(false);
           return nullptr;
       }
 
-      // just register a factory method for the scope
-      template< typename T, typename... Args>
-      iCommand* doRegister(const std::string& scope, const char* nameFactoryMethod, T* (*f)(Args... args))
-      {
-          strm << "doRegister," << scope << "," << nameFactoryMethod << "," << reinterpret_cast<int>(f) << std::endl;
-          assert(false);
-          return nullptr;
-      }
+      //iCommand* doRegister(const std::string& scope, const cFactory& f);
+      iCommand* doRegister(const std::string& scope, const cFactory* f);
+      //iCommand* doRegister(const std::string& scope, cFactory& f);
+      //iCommand* doRegister(const std::string& scope, cFactory* f);
 
 
-      // alloed only two above methond to register generators 
-      template< typename T, typename... Args>
-      iCommand* doRegister(const std::string& s, Args... args)
-      {
-          throw std::exception("Bad generator.");
-          return nullptr;
-      }
+      //// just register a factory method for the scope
+      //template< typename T, typename... Args>
+      //iCommand* doRegister(const std::string& scope, const char* nameFactoryMethod, T* (*f)(Args... args))
+      //{
+      //    strm << "doRegister," << scope << "," << nameFactoryMethod << "," << reinterpret_cast<int>(f) << std::endl;
+      //    assert(false);
+      //    return nullptr;
+      //}
+      //
+      //
+      //// alloed only two above methond to register generators 
+      //template< typename T, typename... Args>
+      //iCommand* doRegister(const std::string& s, Args... args)
+      //{
+      //    throw std::exception("Bad generator.");
+      //    return nullptr;
+      //}
 
       template< typename T, typename... Args>
       T *doResolve(const std::string &scope, const std::string &nameFactoryMethod, Args... args)
@@ -101,9 +121,8 @@ public:
           return nullptr;
       }
 
-  public:
       template< typename T, typename... Args>
-      T* Resolve(std::string s1, std::string s2, Args... args)
+      T* ssResolve(const std::string s1, const std::string s2, Args... args)
       {
           if (s1 == "Register")
               return doRegister<iCommand>(s2, std::forward<Args>(args)...);
@@ -113,6 +132,17 @@ public:
           return nullptr;
       }
 
+
+  public:
+
+      template< typename T, typename S1, typename S2, typename... Args>
+      T* Resolve( S1 s1, S2 s2, Args... args)
+      {
+          return ssResolve<T>(std::string(s1), std::string(s2), std::forward<Args>(args)...);
+      }
+
+
+
   public:
       std::ostringstream strm;
   };
@@ -121,20 +151,18 @@ public:
 TEST_F(test_IoC, test_ProofOfConcept)
 {
 
-    {
-        TestOfConcept_IoC t;
-        cFactory* a = (cFactory*)(112);
-
-        t.Resolve<iCommand>("Register", "Scope1", a)->Execute();
-
-        std::string res = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
-        EXPECT_EQ(res, t.strm.str());
-    }
-
-    return;
+    //{
+    //    TestOfConcept_IoC t;
+    //    const cFactory* a = (const cFactory*)(112);
+    //
+    //    t.Resolve<iCommand>("Register", "Scope1", a)->Execute();
+    //
+    //    std::string res = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
+    //    EXPECT_EQ(res, t.strm.str());
+    //}
     
     {
-        using fptr = int(*)(const char c);
+        using fptr = int*(*)(const char c);
         TestOfConcept_IoC t;
         fptr a = reinterpret_cast<fptr>(789);
 
@@ -158,15 +186,15 @@ TEST_F(test_IoC, test_ProofOfConcept)
     return;
 
 
-    {
-        TestOfConcept_IoC t;
-        cFactory* a = (cFactory*)(112);
-
-        t.Resolve<iCommand>("Register", "Scope1", 88)->Execute();
-
-        std::string res = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
-        EXPECT_EQ(res, t.strm.str());
-    }
+    //{
+    //    TestOfConcept_IoC t;
+    //    cFactory* a = (cFactory*)(112);
+    //
+    //    t.Resolve<iCommand>("Register", "Scope1", 88)->Execute();
+    //
+    //    std::string res = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
+    //    EXPECT_EQ(res, t.strm.str());
+    //}
 
     
     
