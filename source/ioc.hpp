@@ -4,30 +4,70 @@
 
 #include <string>
 #include <memory>
-
+#include <functional>
+#include <map>
 
 // IoC-container
-// with only entry?
-//  std::shared_ptr<T> Resolve(std::string s, Args... args);
+// with only entry
+// T *Resolve(std::string s, Args... args);
 // if s is "Register" this means query to register factory or factory method
 // Registering a factory is performing by the function 
-// std::shared_ptr<iCommand> registerFactory(std::string scope, const cFactory &);
+// iCommand *registerFactory(std::string scope, const cFactory &);
 // class cFactory  is a wrapper of std::map<string,void*> by key = object name and 
 // void * is a factory method.
-// User should run Execute() of to perform real registering
-// Registering a factory methon is performing by the function 
-// std::shared_ptr<iCommand> registerFactoryMethod(const std::string &scope, const std::string s, const cFactory &);
+// User should run Execute() to perform real registering
 
 class iCommand
 {
 public:
 	virtual void Execute() = 0;
-
 };
+
+
 class cFactory
 {
+	public:
+
+		template< typename T, typename... Args>
+		using funcPointer = T * (*)(Args... args);
+
+		template< typename T, typename... Args>
+		void Register(const std::string& objName, T* (*f)(Args... args))
+		{
+			doRegister(objName, (const void*)f);
+		}
+
+		template< typename T, typename... Args>
+		void Register(const std::string& objName, std::function<T*(Args... args)> f)
+		{
+			auto t = f.target<funcPointer<T, Args...> >();
+			doRegister(objName, t);
+		}
 
 
+		template< typename T, typename... Args>
+		funcPointer<T,Args...> getFactoryMethod(const std::string& objName) const 
+		{
+			try 
+			{
+				const void *&value = map.at(objName);
+				return funcPointer<T, Args...>(value);
+			}
+			catch (const std::out_of_range&) 
+			{
+				throw cException();
+			}
+		}
+
+	protected:
+		void doRegister(const std::string& objName, const void* f)
+		{
+			factoryMethods[objName] = f;
+		}
+
+  protected:
+
+		std::map<std::string, const void*> factoryMethods;
 };
 
 class IoC
