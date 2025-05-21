@@ -25,42 +25,6 @@ public:
   };
 };
 
-TEST_F(test_cFactory, test_ctor)
-{
-  Test_cFactory t;
-  EXPECT_EQ(0,t.factoryMethods.size());
-}
-
-TEST_F(test_cFactory, test_doRegister)
-{
-  Test_cFactory t; 
-  int i;
-
-  t.doRegister("t", &i);
-
-  EXPECT_EQ(1, t.factoryMethods.size());
-  EXPECT_EQ( &i, t.factoryMethods["t"] );
-}
-
-TEST_F(test_cFactory, test_Register)
-{
-  Test_cFactory t;
-
-  t.Register(std::string("int"), Test_cFactory::GetInt );
-  t.Register(std::string("Test_cFactory"), Test_cFactory::Clone  );
-
-  std::function< Test_cFactory* (const Test_cFactory&) > m = [](const Test_cFactory&)->Test_cFactory* { return new Test_cFactory; };
-
-  t.Register(std::string("lambda Test_cFactory"), m );
-  //t.Register(std::string("lambda Test_cFactory"), [](const Test_cFactory&)->Test_cFactory* { return new Test_cFactory; });
-
-  EXPECT_EQ(3, t.factoryMethods.size());
-  EXPECT_EQ(&Test_cFactory::GetInt, t.factoryMethods["int"]);
-}
-
-
-
-
 // gTest grouping class
 class test_IoC : public ::testing::Test
 {
@@ -91,87 +55,131 @@ public:
   public:
     // add here members for free access.
     using IoC::IoC; // delegate constructors
-  };
 
-  class TestOfConcept_Command : public iCommand
-  {
-  public:
-    TestOfConcept_Command(std::ostringstream& strm, const char* what) : strm(&strm), what(what)
-    {
-    }
+    using IoC::factories;
+    using IoC::doRegisterFactoryMethod;
 
-    void Execute() override
-    {
-      *strm << "Executing:" << what << std::endl;
-    }
-
-    std::ostringstream* strm;
-    const char* what;
-  };
-
-  class TestOfConcept_IoC
-  {
-    template< typename T, typename... Args>
-    iCommand* doRegisterFactoryMethod(const std::string& scope, const std::string& objName, T* (*)(Args... args))
-    {
-      return nullptr;
-    }
-
-    template< typename T, typename... Args>
-    iCommand* doRegister(const std::string& scope, Args... args)
-    {
-      return doRegisterFactoryMethod(scope, std::forward<Args>(args)...);
-    }
-
-    template<> iCommand* doRegister<iCommand, const cFactory&>(const std::string& scope, const cFactory& f) { return nullptr; }
-    template<> iCommand* doRegister<iCommand, const cFactory*>(const std::string& scope, const cFactory* f) { return doRegister<iCommand, const cFactory&>(scope, *f); }
-    template<> iCommand* doRegister<iCommand, cFactory>(const std::string& scope, cFactory f) { return doRegister<iCommand, const cFactory&>(scope, f); }
-    template<> iCommand* doRegister<iCommand, cFactory&>(const std::string& scope, cFactory& f) { return doRegister<iCommand, const cFactory&>(scope, f); }
-    template<> iCommand* doRegister<iCommand, cFactory*>(const std::string& scope, cFactory* f) { return doRegister<iCommand, const cFactory&>(scope, *f); }
-
-    template< typename T, typename... Args>
-    void* getMethod(const std::string& s1, const std::string& s2)
-    {
-      return nullptr;
-    }
-
-
-    template< typename T, typename... Args>
-    T* doResolve(const std::string s1, const std::string s2, Args... args)
-    {
-      auto method = getMethod<T, Args... >(s1, s2);
-      using f = T * (*)(Args...);
-      return (*f(method))(args...);
-    }
-
-
-    template< typename T, typename... Args>
-    T* ssResolve(const std::string s1, const std::string s2, Args... args)
-    {
-      if (s1 == "Register")
-        return doRegister<iCommand>(s2, std::forward<Args>(args)...);
-      else
-        return doResolve<T>(s1, s2, std::forward<Args>(args)...);
-    }
-
-
-  public:
-
-    template< typename T, typename S1, typename S2, typename... Args>
-    T* Resolve(S1 s1, S2 s2, Args... args)
-    {
-      return ssResolve<T>(std::string(s1), std::string(s2), std::forward<Args>(args)...);
-    }
-
-  public:
-    std::ostringstream strm;
+    using IoC::doRegister;
   };
 };
 
+TEST_F(test_cFactory, test_ctor)
+{
+  Test_cFactory t;
+  EXPECT_EQ(0,t.factoryMethods.size());
+}
+
+TEST_F(test_cFactory, test_doRegister)
+{
+  Test_cFactory t; 
+  int i;
+
+  t.doRegister("t", &i);
+
+  EXPECT_EQ(1, t.factoryMethods.size());
+  EXPECT_EQ( &i, t.factoryMethods["t"] );
+}
+
+TEST_F(test_cFactory, test_Register)
+{
+  // test "old style" function pointers
+  Test_cFactory t;
+
+  t.Register(std::string("int"), Test_cFactory::GetInt );
+  t.Register(std::string("Test_cFactory"), Test_cFactory::Clone  );
+
+  // test lambda. Unfotunatelly a lamnda can't be converted to function pointer automatically
+  // I will grow up and fix this problem. Use this one 
+  struct cTmp
+  {
+    static Test_cFactory* F(const Test_cFactory&) { return new Test_cFactory; };
+  };
+
+  t.Register(std::string("lambda Test_cFactory"), cTmp::F);
+  
+  EXPECT_EQ(3, t.factoryMethods.size());
+  EXPECT_EQ(&Test_cFactory::GetInt, t.factoryMethods["int"]);
+  EXPECT_EQ(&Test_cFactory::Clone, t.factoryMethods["Test_cFactory"]);
+  EXPECT_EQ(&cTmp::F, t.factoryMethods["lambda Test_cFactory"]);
+}
+
+TEST_F(test_cFactory, test_getFactoryMethod)
+{
+  // test "old style" function pointers
+  Test_cFactory t;
+
+  // test lambda. Unfotunatelly a lamnda can't be converted to function pointer automatically
+  // I will grow up and fix this problem. Use this one 
+  struct cTmp
+  {
+    static int* F(const std::string& s) { return nullptr; }
+  };
+
+  t.Register(std::string("K"), cTmp::F);
+  t.Register("int", Test_cFactory::GetInt);
+  t.Register(std::string("Test_cFactory"), Test_cFactory::Clone);
+
+  auto res0 = t.getFactoryMethod<int,const std::string &>(std::string("K"));
+  EXPECT_EQ(&cTmp::F, res0);
+
+  auto res1 = t.getFactoryMethod<int, int, double>("int");
+  EXPECT_EQ(&Test_cFactory::GetInt, res1);
+
+  auto res11 = t.getFactoryMethod<double, int, double>("int");
+
+  // no such factory method
+  try
+  {
+    t.getFactoryMethod<int, int, double>("int1");
+    FAIL();
+  }
+  catch (const std::exception& expected)
+  {
+    ASSERT_STREQ("There isn't such factory method.", expected.what());
+  }
+
+}
+
+
+TEST_F(test_IoC, test_doRegister_Factory )
+{
+  Test_IoC t;
+  test_cFactory::Test_cFactory f;
+
+  f.Register("int", test_cFactory::Test_cFactory::GetInt);
+  f.Register("Test_cFactory", test_cFactory::Test_cFactory::Clone);
+
+  std::unique_ptr<iCommand> res( t.doRegister<iCommand, const cFactory&>("A", f) );
+  EXPECT_EQ(0, t.factories.size());
+  res->Execute();
+  EXPECT_EQ(1, t.factories.size());
+  auto fptr = t.factories["A"].getFactoryMethod<int, int, double>("int");
+  EXPECT_EQ(&test_cFactory::Test_cFactory::GetInt, fptr);
+}
+
+TEST_F(test_IoC, test_doRegisterFactoryMethod)
+{
+  Test_IoC t;
+  test_cFactory::Test_cFactory f;
+
+  f.Register("int", test_cFactory::Test_cFactory::GetInt);
+  t.doRegister<iCommand, const cFactory&>("A", f)->Execute();
+
+  std::unique_ptr<iCommand> res(t.doRegisterFactoryMethod<test_cFactory::Test_cFactory, const test_cFactory::Test_cFactory&>("A", "Test_cFactory", test_cFactory::Test_cFactory::Clone));
+  EXPECT_EQ(1, t.factories["A"].size());
+  res->Execute();
+  EXPECT_EQ(2, t.factories["A"].size());
+
+  auto fptr = t.factories["A"].getFactoryMethod<test_cFactory::Test_cFactory, const test_cFactory::Test_cFactory&>("Test_cFactory");
+  EXPECT_EQ(&test_cFactory::Test_cFactory::Clone, fptr);
+}
+
+
+#if 0
 TEST_F(test_IoC, test_ProofOfConcept)
 {
   {
-    TestOfConcept_IoC t;
+    Test_IoC t;
     cFactory* a0 = (cFactory*)(112);
     cFactory& a1 = *a0;
     const cFactory* b0 = a0;
@@ -194,7 +202,7 @@ TEST_F(test_IoC, test_ProofOfConcept)
 
 
   {
-    TestOfConcept_IoC t;
+    Test_IoC t;
     const cFactory* a = (const cFactory*)(112);
 
     t.Resolve<iCommand>("Register", "Scope1", a)->Execute();
@@ -308,3 +316,6 @@ TEST_F(test_IoC, test_fffff)
   auto m = get_bbbb<1>(1.0, 2, "abd");
   EXPECT_EQ(2, m);
 }
+
+
+#endif 
