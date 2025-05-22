@@ -22,6 +22,8 @@ public:
 
     static int* GetInt(int, double) { return nullptr;  }
     static Test_cFactory* Clone(const Test_cFactory &) { return nullptr; }
+
+    static int* GetInt2(int, double) { return nullptr; }
   };
 };
 
@@ -60,6 +62,7 @@ public:
     using IoC::doRegisterFactoryMethod;
 
     using IoC::doRegister;
+    using IoC::doResolve;
   };
 };
 
@@ -172,7 +175,39 @@ TEST_F(test_IoC, test_doRegisterFactoryMethod)
 
   auto fptr = t.factories["A"].getFactoryMethod<test_cFactory::Test_cFactory, const test_cFactory::Test_cFactory&>("Test_cFactory");
   EXPECT_EQ(&test_cFactory::Test_cFactory::Clone, fptr);
+
+
+  // no such factory method
+  try
+  {
+    std::unique_ptr<iCommand> res(t.doRegisterFactoryMethod<test_cFactory::Test_cFactory, const test_cFactory::Test_cFactory&>("B", "Test_cFactory", test_cFactory::Test_cFactory::Clone));
+    res->Execute();
+    FAIL();
+  }
+  catch (const std::exception& expected)
+  {
+    ASSERT_STREQ("There isn't such factory.", expected.what());
+  }
 }
+
+TEST_F(test_IoC, test_doResolve)
+{
+  Test_IoC t;
+
+  test_cFactory::Test_cFactory f1;
+  f1.Register("int", test_cFactory::Test_cFactory::GetInt);
+  f1.Register("Test_cFactory", test_cFactory::Test_cFactory::Clone);
+  t.doRegister<iCommand, const cFactory&>("A", f1)->Execute();
+
+  test_cFactory::Test_cFactory f2;
+  f2.Register("int", test_cFactory::Test_cFactory::GetInt2);
+  t.doRegister<iCommand, const cFactory&>("B", f1)->Execute();
+
+  auto m = t.doResolve<int>("A", "int");
+  EXPECT_EQ((const void*)test_cFactory::Test_cFactory::GetInt, m);
+}
+
+
 
 
 #if 0

@@ -149,7 +149,6 @@ public:
     return ssResolve<T>(std::string(s1), std::string(s2), std::forward<Args>(args)...);
   }
 
-
 protected:
   template< typename T, typename... Args>
   /**/iCommand* doRegisterFactoryMethod(const std::string& scope, const std::string& objName, T* (*f)(Args... args))
@@ -158,7 +157,7 @@ protected:
   }
 
   template< typename T, typename... Args>
-  iCommand* doRegister(const std::string& scope, Args... args)
+  /**/iCommand* doRegister(const std::string& scope, Args... args)
   {
     return doRegisterFactoryMethod<T,Args...>(scope, std::forward<Args>(args)...);
   }
@@ -210,15 +209,11 @@ inline void iRegisterFactory::Execute()
 
 inline void iRegisterFactoryMethod::Execute()
 {
-  try
-  {
-    auto &m = ioc->factories[scope];
-    m.doRegister(objName, f);
-  }
-  catch (const std::out_of_range&) // Ups.... 
-  {
+  if (ioc->factories.find(scope) == ioc->factories.end()) 
     throw cException("There isn't such factory.");
-  }
+
+  auto &m = ioc->factories[scope];
+  m.doRegister(objName, f);
 }
 
 
