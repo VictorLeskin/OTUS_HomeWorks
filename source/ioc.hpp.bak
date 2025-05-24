@@ -134,7 +134,6 @@ protected:
   friend struct iRegisterFactory;
   friend struct iRegisterFactoryMethod;
 
-
 private:
   IoC(const IoC&) = delete;
   IoC &operator=(const IoC&) = delete;
@@ -143,11 +142,22 @@ public:
   IoC() = default;
   ~IoC() = default;
 
+
   template< typename T, typename S1, typename S2, typename... Args>
   T* Resolve(S1 s1, S2 s2, Args... args)
   {
-    // convert paramters to string ..... 
-    return ssResolve<T>(std::string(s1), std::string(s2), std::forward<Args>(args)...);
+    return doResolve<T>(s1, s2, std::forward<Args>(args)...);
+  }
+
+  template<>
+  template< typename S1, typename S2, typename... Args>
+  iCommand* Resolve(S1 s1, S2 s2, Args... args)
+  {
+	  // convert paramters to string ..... 
+	  if (s1 == "Register")
+		  return doRegister<iCommand>(s2, std::forward<Args>(args)...);
+	  else
+		  return nullptr;
   }
 
 protected:

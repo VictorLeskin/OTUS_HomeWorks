@@ -20,12 +20,25 @@ public:
     using cFactory::factoryMethods;
     using cFactory::doRegister;
 
-    static int* GetInt(int, double) { return nullptr;  }
-    static Test_cFactory* Clone(const Test_cFactory &) { return nullptr; }
 
-    static int* GetInt2(int, double) { return nullptr; }
+    static Test_cFactory* Clone(const Test_cFactory&) { return nullptr; }
+
+    static int resGetInt;
+    static int resGetInt2;
+    static int* GetInt(int, double) { return &resGetInt;  }
+    static int* GetInt2(int, double) { return &resGetInt2; }
+    static int* GetInt3(std::string s ) 
+    { 
+        static int num;
+        num = std::stoi(s);
+        return &num; 
+    }
   };
 };
+
+int test_cFactory::Test_cFactory::resGetInt = 1;
+int test_cFactory::Test_cFactory::resGetInt2 = 2;
+
 
 // gTest grouping class
 class test_IoC : public ::testing::Test
@@ -60,6 +73,7 @@ public:
 
     using IoC::factories;
     using IoC::doRegisterFactoryMethod;
+    using IoC::getMethod;
 
     using IoC::doRegister;
     using IoC::doResolve;
@@ -190,7 +204,7 @@ TEST_F(test_IoC, test_doRegisterFactoryMethod)
   }
 }
 
-TEST_F(test_IoC, test_doResolve)
+TEST_F(test_IoC, test_getMethod)
 {
   Test_IoC t;
 
@@ -201,156 +215,69 @@ TEST_F(test_IoC, test_doResolve)
 
   test_cFactory::Test_cFactory f2;
   f2.Register("int", test_cFactory::Test_cFactory::GetInt2);
-  t.doRegister<iCommand, const cFactory&>("B", f1)->Execute();
+  t.doRegister<iCommand, const cFactory&>("B", f2)->Execute();
 
-  auto m = t.doResolve<int>("A", "int");
-  EXPECT_EQ((const void*)test_cFactory::Test_cFactory::GetInt, m);
+  auto m1 = t.getMethod<int>("A", "int");
+  EXPECT_EQ((const void*)test_cFactory::Test_cFactory::GetInt, m1);
+
+  auto m2 = t.getMethod<int>("B", "int");
+  EXPECT_EQ((const void*)test_cFactory::Test_cFactory::GetInt2, m2);
 }
 
-
-
-
-#if 0
-TEST_F(test_IoC, test_ProofOfConcept)
+TEST_F(test_IoC, test_doResolve)
 {
-  {
     Test_IoC t;
-    cFactory* a0 = (cFactory*)(112);
-    cFactory& a1 = *a0;
-    const cFactory* b0 = a0;
-    const cFactory& b1 = *b0;
 
-    using fptrc = int* (*)(const char c);
-    fptrc c = reinterpret_cast<fptrc>(789);
+    test_cFactory::Test_cFactory f1;
+    f1.Register("int", test_cFactory::Test_cFactory::GetInt);
+    f1.Register("int3", test_cFactory::Test_cFactory::GetInt3);
+    t.doRegister<iCommand, const cFactory&>("A", f1)->Execute();
 
+    test_cFactory::Test_cFactory f2;
+    f2.Register("int", test_cFactory::Test_cFactory::GetInt2);
+    t.doRegister<iCommand, const cFactory&>("B", f2)->Execute();
 
-    t.Resolve<iCommand>("Register", "Scope1", a0)->Execute();
-    t.Resolve<iCommand>("Register", "Scope1", a1)->Execute();
-    t.Resolve<iCommand>("Register", "Scope1", b0)->Execute();
-    t.Resolve<iCommand>("Register", "Scope1", b1)->Execute();
-    t.Resolve<iCommand>("Register", "Scope1", "obj", c)->Execute();
+    int* m1 = t.doResolve<int>("B", "int", 2, 33.0);
+    int* m2 = t.doResolve<int>("A", "int3", std::string("256") );
 
-    std::string res = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
-    EXPECT_EQ(res, t.strm.str());
-  }
+    EXPECT_EQ( &test_cFactory::Test_cFactory::resGetInt2, m1);
+    EXPECT_EQ( 2, *m1);
+    EXPECT_EQ( 256, *m2);
 
+    // no such factory method
+    try
+    {
+        int* m1 = t.doResolve<int>("C", "int", 2, 33.0);
+        FAIL();
+    }
+    catch (const std::exception& expected)
+    {
+        ASSERT_STREQ("There isn't such factory.", expected.what());
+    }
 
+    // no such factory method
+    try
+    {
+        int* m1 = t.doResolve<int>("B", "int88", 2, 33.0);
+        FAIL();
+    }
+    catch (const std::exception& expected)
+    {
+        ASSERT_STREQ("There isn't such factory method.", expected.what());
+    }
+}
 
-  {
+TEST_F(test_IoC, test_Resolve)
+{
     Test_IoC t;
-    const cFactory* a = (const cFactory*)(112);
 
-    t.Resolve<iCommand>("Register", "Scope1", a)->Execute();
+    test_cFactory::Test_cFactory f1;
+    f1.Register("int", test_cFactory::Test_cFactory::GetInt);
 
-    std::string res = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
-    EXPECT_EQ(res, t.strm.str());
-  }
+    // registering 
+    t.Resolve<iCommand>("Register", "A", f1)->Execute();
+    t.Resolve<iCommand>("Register", "A", "int3", test_cFactory::Test_cFactory::GetInt3 )->Execute();
 
-  {
-    using fptr = int* (*)(const char c);
-    TestOfConcept_IoC t;
-    fptr a = reinterpret_cast<fptr>(789);
-
-    t.Resolve<iCommand>(std::string("Register"), std::string("Scope1"), std::string("Object Name"), a)->Execute();
-
-    std::string res = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
-    EXPECT_EQ(res, t.strm.str());
-
-    //auto sum = [](double a, double b)
-    //{
-    //        return a + b;
-    //};
-    //
-    //t.Resolve<iCommand>("Register", "Scope1", "Object Name", sum)->Execute();
-    //
-    //std::string res1 = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
-    //EXPECT_EQ(res1, t.strm.str());
-
-  }
-
-  return;
-
-
-  //{
-  //    TestOfConcept_IoC t;
-  //    cFactory* a = (cFactory*)(112);
-  //
-  //    t.Resolve<iCommand>("Register", "Scope1", 88)->Execute();
-  //
-  //    std::string res = "doRegister,Scope1,Object Name,789\nExecuting:doRegister\n";
-  //    EXPECT_EQ(res, t.strm.str());
-  //}
-
-
-
-  //{
-  //    TestOfConcept_IoC t;
-  //
-  //    std::shared_ptr<Test_Obj> m = t.Resolve<Test_Obj>("Scope1", "Test_ObjName", 2, "ab");
-  //    std::string res = "doResolve,Scope1,Test_ObjName\n";
-  //    EXPECT_EQ(res, t.strm.str());
-  //}
-
+    int* m2 = t.Resolve<int, std::string>("A", "int3", std::string("256"));
+    EXPECT_EQ(256, *m2);
 }
-
-//TEST_F(test_IoC, test_Resolve )
-//{
-//  Test_IoC t;
-//  const char* sz = "Amazing";
-//
-//  auto p = t.Resolve<Test_Obj>(std::string("Test_Obj"), 2, sz );
-//
-//  EXPECT_EQ(true, p->i.has_value() ); EXPECT_EQ(2, p->i);
-//  EXPECT_EQ(true, p->sz.has_value()); EXPECT_EQ(sz, p->sz);
-//  EXPECT_EQ(false, p->d.has_value()); 
-//
-//  auto q = t.Resolve<Test_Obj>(std::string("Test_Obj"), 232.0 );
-//  EXPECT_EQ(false, q->i.has_value()); 
-//  EXPECT_EQ(false, q->sz.has_value()); 
-//  EXPECT_EQ(true, q->d.has_value());EXPECT_EQ(232.0, q->d);
-//}
-//
-//TEST_F(test_IoC, test_Resolve_With_Register)
-//{
-//    Test_IoC t;
-//    const char* sz = "Amazing";
-//
-//    auto p = t.Resolve<Test_Obj>(std::string("Register"), std::string("Test_Obj"), Test_Obj::CreateA);
-//}
-
-
-
-int f(double d, int x)
-{
-  return int(x + d);
-}
-
-// helper to convert function pointer as void * to real function 
-template<typename T, typename... Args>
-T callFunction(void* function, const Args&... args)
-{
-  return reinterpret_cast<T(*)(Args...)>(function)(args...);
-}
-
-TEST_F(test_IoC, test_ConvertFunctionPointer)
-{
-  void* function = reinterpret_cast<void*>(&f);
-
-  EXPECT_EQ(4, (callFunction<int, double, int>(function, 1, 3)));
-  EXPECT_EQ(4, (callFunction<int>(function, 1.0, 3)));
-}
-
-
-template <int I, class... Ts>
-decltype(auto) get_bbbb(Ts&&... ts) {
-  return std::get<I>(std::forward_as_tuple(ts...));
-}
-
-TEST_F(test_IoC, test_fffff)
-{
-  auto m = get_bbbb<1>(1.0, 2, "abd");
-  EXPECT_EQ(2, m);
-}
-
-
-#endif 
