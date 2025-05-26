@@ -166,7 +166,7 @@ TEST_F(test_IoC, test_doRegister_Factory )
   f.Register("int", test_cFactory::Test_cFactory::GetInt);
   f.Register("Test_cFactory", test_cFactory::Test_cFactory::Clone);
 
-  std::unique_ptr<iCommand> res( t.doRegister<iCommand, const cFactory&>("A", f) );
+  std::unique_ptr<iCommand> res( t.doRegister<iCommand, const cFactory&>(sRegister(), "A", f) );
   EXPECT_EQ(0, t.factories.size());
   res->Execute();
   EXPECT_EQ(1, t.factories.size());
@@ -180,7 +180,7 @@ TEST_F(test_IoC, test_doRegisterFactoryMethod)
   test_cFactory::Test_cFactory f;
 
   f.Register("int", test_cFactory::Test_cFactory::GetInt);
-  t.doRegister<iCommand, const cFactory&>("A", f)->Execute();
+  t.doRegister<iCommand, const cFactory&>(sRegister(), "A", f)->Execute();
 
   std::unique_ptr<iCommand> res(t.doRegisterFactoryMethod<test_cFactory::Test_cFactory, const test_cFactory::Test_cFactory&>("A", "Test_cFactory", test_cFactory::Test_cFactory::Clone));
   EXPECT_EQ(1, t.factories["A"].size());
@@ -211,11 +211,11 @@ TEST_F(test_IoC, test_getMethod)
   test_cFactory::Test_cFactory f1;
   f1.Register("int", test_cFactory::Test_cFactory::GetInt);
   f1.Register("Test_cFactory", test_cFactory::Test_cFactory::Clone);
-  t.doRegister<iCommand, const cFactory&>("A", f1)->Execute();
+  t.doRegister<iCommand, const cFactory&>(sRegister(), "A", f1)->Execute();
 
   test_cFactory::Test_cFactory f2;
   f2.Register("int", test_cFactory::Test_cFactory::GetInt2);
-  t.doRegister<iCommand, const cFactory&>("B", f2)->Execute();
+  t.doRegister<iCommand, const cFactory&>(sRegister(), "B", f2)->Execute();
 
   auto m1 = t.getMethod<int>("A", "int");
   EXPECT_EQ((const void*)test_cFactory::Test_cFactory::GetInt, m1);
@@ -231,11 +231,11 @@ TEST_F(test_IoC, test_doResolve)
     test_cFactory::Test_cFactory f1;
     f1.Register("int", test_cFactory::Test_cFactory::GetInt);
     f1.Register("int3", test_cFactory::Test_cFactory::GetInt3);
-    t.doRegister<iCommand, const cFactory&>("A", f1)->Execute();
+    t.doRegister<iCommand, const cFactory&>(sRegister(), "A", f1)->Execute();
 
     test_cFactory::Test_cFactory f2;
     f2.Register("int", test_cFactory::Test_cFactory::GetInt2);
-    t.doRegister<iCommand, const cFactory&>("B", f2)->Execute();
+    t.doRegister<iCommand, const cFactory&>(sRegister(), "B", f2)->Execute();
 
     int* m1 = t.doResolve<int>("B", "int", 2, 33.0);
     int* m2 = t.doResolve<int>("A", "int3", std::string("256") );
