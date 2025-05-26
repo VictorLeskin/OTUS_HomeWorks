@@ -150,7 +150,7 @@ public:
     return ssResolve<T>(std::string(s1), std::string(s2), std::forward<Args>(args)...);
   }
 
-protected:
+ protected:
   template< typename T, typename... Args>
   /**/iCommand* doRegisterFactoryMethod(const std::string& scope, const std::string& objName, T* (*f)(Args... args))
   {

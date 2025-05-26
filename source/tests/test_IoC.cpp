@@ -1,4 +1,4 @@
-///************************* ITELMA SP ****************************************
+﻿///************************* ITELMA SP ****************************************
 
 #include <gtest/gtest.h>
 
@@ -6,6 +6,12 @@
 #include <optional>
 
 // clang-format off
+
+template <size_t N, typename... Args>
+auto get_nth(Args... args) 
+{
+  return std::get<N>(std::forward_as_tuple(std::forward<Args>(args)...));
+}
 
 // gTest grouping class
 class test_cFactory : public ::testing::Test
@@ -275,15 +281,15 @@ TEST_F(test_IoC, test_Resolve)
     f1.Register("int", test_cFactory::Test_cFactory::GetInt);
 
     // registering 
-    t.Resolve<iCommand>("Register", "A", f1)->Execute();
-    t.Resolve<iCommand>("Register", "A", "int3", test_cFactory::Test_cFactory::GetInt3 )->Execute();
+    //t.Resolve<iCommand>("Register", "A", f1)->Execute();
+    //t.Resolve<iCommand>("Register", "A", "int3", test_cFactory::Test_cFactory::GetInt3 )->Execute();
 
-    int* m2 = t.Resolve<int>("A", "int3", std::string("256"));
+    //int* m2 = t.Resolve<int>("A", "int3", std::string("256"));
     //EXPECT_EQ(256, *m2);
 }
 
 
-class IoC22
+class IoC22 : public IoC
 {
     // class 
 protected:
@@ -303,19 +309,102 @@ public:
     IoC22() = default;
     ~IoC22() = default;
 
-    template< typename T, typename A >
-    T* ssResolve(const std::string s1, const std::string s2, const A &args);
+    template< typename R, typename... Args>
+    iCommand* doRegisterFactoryMethod(const std::string& scope, const std::string& objName, R* (*f)(Args... args))
+    {
+      return new iRegisterFactoryMethod(*this, scope, objName, (const void*)f);
+    }
+
+
+    iCommand* doRegister1(const std::string& scope, const cFactory& f)
+    {
+      return new iRegisterFactory(*this, scope, f);
+    }
+
+    template< typename R, typename... Args>
+    /**/iCommand* doRegister(const std::string& scope, std::string objName, R* (*f)(Args... args))
+    {
+      return new iRegisterFactoryMethod(*this, scope, objName, (const void*)f);
+    }
+
+
+    template<typename F>
+    iCommand* doRegisterFactory(const std::string& scope, F f)
+    {
+      return nullptr;
+    }
 
     template<>
-    iCommand* ssResolve<iCommand, std::tuple<test_cFactory::Test_cFactory> >
-        (const std::string s1, const std::string s2, const std::tuple<test_cFactory::Test_cFactory>& args)
-    { return nullptr; }
+    iCommand* doRegisterFactory(const std::string& scope, cFactory f)
+    {
+      return new iRegisterFactory(*this, scope, f);
+    }
+
+    template< typename... Args>
+    iCommand* doRegisterT(const std::string& scope, Args... args)
+    {
+      if ((sizeof...(Args) == 1))
+        return doRegisterFactory( scope, get_nth<0, Args...>(args...));
+      else if ((sizeof...(Args) == 2))
+        return doRegisterFactoryMethod(scope, 
+          get_nth<0, Args...>(args...), // obj name 
+          get_nth<1, Args...>(args...) ); // factory method
+      return nullptr;
+    }
+
+
+    template< typename T, typename... Args>
+    T* ssResolve(const std::string s1, const std::string s2, Args... args)
+    {
+      if (s1 == "Register")
+      {
+        if (true == std::is_same<T, iCommand>::value)
+          return (T*)doRegisterT<Args...>(s2, std::forward<Args>(args)...);
+        else
+          throw(std::exception("Ups"));
+      }
+      else
+        return doResolve<T,Args...>(s1, s2, args... );
+    }
+
+    template< typename T, typename... Args>
+    T* doResolve(const std::string s1, const std::string s2, Args... args)
+    {
+      auto method = getMethod<T, Args... >(s1, s2);
+      using f = T * (*)(Args...);
+      return (*f(method))(args...);
+    }
+
 
     template< typename T, typename S1, typename S2, typename... Args>
     T* Resolve(S1 s1, S2 s2, Args... args)
     {
-        // convert paramters to string ..... 
-        return ssResolve<T>(std::string(s1), std::string(s2), std::tuple<Args...>(args...) );
+      std::string ss1( static_cast<std::string>(s1) );
+      std::string ss2( static_cast<std::string>(s2) );
+
+      auto t = std::make_tuple( args...);
+
+      if (ss1 == "Register")
+      {
+        if constexpr (std::tuple_size< decltype(t)>::value == 1 )
+        {
+          const auto& f = std::get<0>(t);
+          const std::string s = typeid(f).name();
+          return (T*)doRegisterFactory(ss2, f);
+        }
+
+        if constexpr (std::tuple_size< decltype(t)>::value == 2)
+        {
+          auto t = std::make_tuple(args...);
+          auto objName = std::get<0>(t);
+          auto fm = std::get<1>(t);
+          return doRegister(ss2, objName, fm);
+        }
+        else
+          throw(std::exception("hihi"));
+      }
+
+      return doResolve<T,Args...>(ss1, ss2, std::forward<Args>(args)...);
     }
 
 protected:
@@ -351,13 +440,14 @@ TEST_F(test_IoC22, test_Resolve)
     Test_IoC22 t;
 
     test_cFactory::Test_cFactory f1;
+    
     f1.Register("int", test_cFactory::Test_cFactory::GetInt);
 
     // registering 
-    t.Resolve<iCommand>("Register", "A", f1)->Execute();
+    const cFactory& f11 = f1;
+    t.Resolve<iCommand>("Register", "A", f11)->Execute();
     t.Resolve<iCommand>("Register", "A", "int3", test_cFactory::Test_cFactory::GetInt3 )->Execute();
-
-    int* m2 = t.Resolve<int, std::string>("A", "int3", std::string("256"));
+    //
+    int* m2 = t.Resolve<int>("A", "int3", std::string("256"));
     EXPECT_EQ(256, *m2);
 }
-
