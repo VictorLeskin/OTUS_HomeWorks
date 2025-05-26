@@ -302,31 +302,23 @@ private:
     IoC22(const IoC22&) = delete;
     IoC22& operator=(const IoC22&) = delete;
 
-
-
-
 public:
     IoC22() = default;
     ~IoC22() = default;
 
+
+    template< typename T, typename S1, typename S2, typename... Args>
+    T* Resolve(S1 s1, S2 s2, Args... args)
+    {
+      return ssResolve<T>(std::string(s1), std::string(s2), std::forward<Args>(args)...);
+    }
+
+protected:
     template< typename R, typename... Args>
     iCommand* doRegisterFactoryMethod(const std::string& scope, const std::string& objName, R* (*f)(Args... args))
     {
       return new iRegisterFactoryMethod(*this, scope, objName, (const void*)f);
     }
-
-
-    iCommand* doRegister1(const std::string& scope, const cFactory& f)
-    {
-      return new iRegisterFactory(*this, scope, f);
-    }
-
-    template< typename R, typename... Args>
-    /**/iCommand* doRegister(const std::string& scope, std::string objName, R* (*f)(Args... args))
-    {
-      return new iRegisterFactoryMethod(*this, scope, objName, (const void*)f);
-    }
-
 
     template<typename F>
     iCommand* doRegisterFactory(const std::string& scope, F f)
@@ -340,31 +332,32 @@ public:
       return new iRegisterFactory(*this, scope, f);
     }
 
-    template< typename... Args>
-    iCommand* doRegisterT(const std::string& scope, Args... args)
-    {
-      if ((sizeof...(Args) == 1))
-        return doRegisterFactory( scope, get_nth<0, Args...>(args...));
-      else if ((sizeof...(Args) == 2))
-        return doRegisterFactoryMethod(scope, 
-          get_nth<0, Args...>(args...), // obj name 
-          get_nth<1, Args...>(args...) ); // factory method
-      return nullptr;
-    }
-
-
     template< typename T, typename... Args>
     T* ssResolve(const std::string s1, const std::string s2, Args... args)
     {
+
       if (s1 == "Register")
       {
-        if (true == std::is_same<T, iCommand>::value)
-          return (T*)doRegisterT<Args...>(s2, std::forward<Args>(args)...);
-        else
-          throw(std::exception("Ups"));
+        auto t = std::make_tuple(args...);
+
+        if constexpr (std::tuple_size< decltype(t)>::value == 1)
+        {
+          const auto& f = std::get<0>(t);
+          //const std::string s = typeid(f).name();
+          return (T*)doRegisterFactory(s2, f);
+        }
+
+        if constexpr (std::tuple_size< decltype(t)>::value == 2)
+        {
+          auto objName = std::get<0>(t);
+          auto fm = std::get<1>(t);
+          return doRegisterFactoryMethod(s2, objName, fm);
+        }
+        
+        throw(std::exception("hihi"));
       }
-      else
-        return doResolve<T,Args...>(s1, s2, args... );
+
+      return doResolve<T, Args...>(s1, s2, std::forward<Args>(args)...);
     }
 
     template< typename T, typename... Args>
@@ -374,40 +367,6 @@ public:
       using f = T * (*)(Args...);
       return (*f(method))(args...);
     }
-
-
-    template< typename T, typename S1, typename S2, typename... Args>
-    T* Resolve(S1 s1, S2 s2, Args... args)
-    {
-      std::string ss1( static_cast<std::string>(s1) );
-      std::string ss2( static_cast<std::string>(s2) );
-
-      auto t = std::make_tuple( args...);
-
-      if (ss1 == "Register")
-      {
-        if constexpr (std::tuple_size< decltype(t)>::value == 1 )
-        {
-          const auto& f = std::get<0>(t);
-          const std::string s = typeid(f).name();
-          return (T*)doRegisterFactory(ss2, f);
-        }
-
-        if constexpr (std::tuple_size< decltype(t)>::value == 2)
-        {
-          auto t = std::make_tuple(args...);
-          auto objName = std::get<0>(t);
-          auto fm = std::get<1>(t);
-          return doRegister(ss2, objName, fm);
-        }
-        else
-          throw(std::exception("hihi"));
-      }
-
-      return doResolve<T,Args...>(ss1, ss2, std::forward<Args>(args)...);
-    }
-
-protected:
 
 
 protected:
@@ -449,5 +408,8 @@ TEST_F(test_IoC22, test_Resolve)
     t.Resolve<iCommand>("Register", "A", "int3", test_cFactory::Test_cFactory::GetInt3 )->Execute();
     //
     int* m2 = t.Resolve<int>("A", "int3", std::string("256"));
+
+    double* m3 = t.Resolve<double>("A", "int3", std::string("256"), 333, &f1 );
+
     EXPECT_EQ(256, *m2);
 }
