@@ -338,19 +338,17 @@ protected:
 
       if (s1 == "Register")
       {
-        auto t = std::make_tuple(args...);
-
-        if constexpr (std::tuple_size< decltype(t)>::value == 1)
+        if constexpr (sizeof...(Args) == 1)
         {
-          const auto& f = std::get<0>(t);
+          const auto& f = std::get<0>(std::forward_as_tuple(args...));
           //const std::string s = typeid(f).name();
           return (T*)doRegisterFactory(s2, f);
         }
 
-        if constexpr (std::tuple_size< decltype(t)>::value == 2)
+        if constexpr (sizeof...(Args) == 2)
         {
-          auto objName = std::get<0>(t);
-          auto fm = std::get<1>(t);
+          auto objName = std::get<0>(std::forward_as_tuple(args...));
+          auto fm = std::get<1>(std::forward_as_tuple(args...));
           return doRegisterFactoryMethod(s2, objName, fm);
         }
         
@@ -367,7 +365,6 @@ protected:
       using f = T * (*)(Args...);
       return (*f(method))(args...);
     }
-
 
 protected:
     std::map<std::string, cFactory> factories;
@@ -408,8 +405,8 @@ TEST_F(test_IoC22, test_Resolve)
     t.Resolve<iCommand>("Register", "A", "int3", test_cFactory::Test_cFactory::GetInt3 )->Execute();
     //
     int* m2 = t.Resolve<int>("A", "int3", std::string("256"));
+    EXPECT_EQ(256, *m2);
 
     double* m3 = t.Resolve<double>("A", "int3", std::string("256"), 333, &f1 );
-
-    EXPECT_EQ(256, *m2);
+    double* m4 = t.Resolve<double>("A", "int3", std::string("256"), 333, &f1);
 }

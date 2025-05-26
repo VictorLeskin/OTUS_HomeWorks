@@ -179,9 +179,9 @@ public:
   {
 	// find scope factory
     auto factoryIt = factories.find(scope);
-	if (factoryIt == factories.end())
-		throw cException("There isn't such factory.");
-	return factoryIt->second.getFactoryMethod<T, Args...>(objName);
+	  if (factoryIt == factories.end())
+		  throw cException("There isn't such factory.");
+	  return factoryIt->second.getFactoryMethod<T, Args...>(objName);
   }
 
   template< typename T, typename... Args>
