@@ -79,6 +79,21 @@ public:
   };
 };
 
+// gTest grouping class
+class test_Multithreading : public ::testing::Test
+{
+public:
+  // additional class to access to member of tested class
+  class Test_Multithreading
+  {
+  public:
+    static thread_local IoC t0;
+  };
+};
+
+thread_local IoC test_Multithreading::Test_Multithreading::t0;
+
+
 TEST_F(test_cFactory, test_ctor)
 {
   Test_cFactory t;
@@ -390,4 +405,68 @@ TEST_F(test_IoC, test_Resolve)
 
   double* m3 = t.Resolve<double>("A", "int3", std::string("256"), 333, &f1);
   double* m4 = t.Resolve<double>("A", "int3", std::string("256"), 333, &f1);
+}
+
+enum { RUN_COUNT = 10'000 };
+int cnt1 = 0, cnt2 = 0;
+
+void thread1() 
+{
+  test_cFactory::Test_cFactory f1;
+  f1.Register("int", test_cFactory::Test_cFactory::GetInt);
+
+  // registering 
+  const cFactory& f11 = f1;
+  std::shared_ptr<iCommand> c( test_Multithreading::Test_Multithreading::t0.Resolve<iCommand>("Register", "thread #1", f11) );
+  c->Execute();
+
+  for (int i = 0; i < RUN_COUNT; ++i)
+  {
+    int *x = test_Multithreading::Test_Multithreading::t0.Resolve<int>("thread #1", "int");
+    EXPECT_EQ(x, &test_cFactory::Test_cFactory::resGetInt);
+    if (x == &test_cFactory::Test_cFactory::resGetInt)
+      ++cnt1;
+  }
+}
+
+void thread2()
+{
+  test_cFactory::Test_cFactory f1;
+  f1.Register("int", test_cFactory::Test_cFactory::GetInt2);
+
+  // registering 
+  const cFactory& f11 = f1;
+  std::shared_ptr<iCommand> c(test_Multithreading::Test_Multithreading::t0.Resolve<iCommand>("Register", "thread #2", f11));
+  c->Execute();
+
+  for (int i = 0; i < RUN_COUNT; ++i)
+  {
+    int* x = test_Multithreading::Test_Multithreading::t0.Resolve<int>("thread #2", "int");
+    EXPECT_EQ(x, &test_cFactory::Test_cFactory::resGetInt2);
+    if (x == &test_cFactory::Test_cFactory::resGetInt2)
+      ++cnt2;
+  }
+}
+
+
+TEST_F(test_Multithreading, test_)
+{
+  // create n thread. Each of them use a IoC container 
+  // in thread_local IoC test_Multithreading::Test_Multithreading::t0;
+  // in own scope but with different factory methods. 
+  // The variable is declared with thread_local attribute, so let's hope
+  // that compiler/linker will do a real work.
+
+  //thread1();
+  //thread2();
+
+  std::thread t1(thread1);
+  std::thread t2(thread2);
+
+  t1.join();
+  t2.join();
+
+
+  EXPECT_EQ(RUN_COUNT, cnt1);
+  EXPECT_EQ(RUN_COUNT, cnt2);
 }
