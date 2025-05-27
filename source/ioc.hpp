@@ -172,8 +172,6 @@ protected:
     return nullptr; 
   }
 
-  template<>
-  iCommand* doRegisterFactory(const std::string& scope, const cFactory& f);
 
   template< typename T, typename... Args>
   T* doResolve(const std::string s1, const std::string s2, Args... args)
