@@ -156,7 +156,7 @@ protected:
     auto factoryIt = factories.find(scope);
     if (factoryIt == factories.end())
       throw cException("There isn't such factory.");
-    return factoryIt->second.getFactoryMethod<T, Args...>(objName);
+    return reinterpret_cast<void*>(factoryIt->second.getFactoryMethod<T, Args...>(objName));
   }
 
   template< typename R, typename... Args>
