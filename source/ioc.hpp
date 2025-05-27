@@ -116,15 +116,21 @@ protected:
   std::map<std::string, const void*> factoryMethods;
 };
 
-// cIoC container class for a factory pattern.
-// function Resolve with first parameter "Register" registers a factory or factory method of a scope
-// and returns pointer to instance of iCommand. The command shold execute to perform real registering like
-// cIoC t;
-// cFactory f;
-// extern int *generateInt( double, string );
-// f.Register("",.function );
-// t.Resolve( "Register", "ScopeName", f )->Execute();
-// t.Resolve( "Register", "ScopeName", "get int for me", generateInt )->Execute();
+// cIoC is a container class for a factory pattern.  
+// The Resolve function with first parameter "Register" registers a factory or a factory method  
+// within a scope and returns a pointer to an instance of iCommand. The command must be executed  
+// to perform the actual registration, for example:  
+// cIoC t;  
+// cFactory f;  
+// extern int* generateInt(double, string);  
+// f.Register("", function);  
+// t.Resolve<iCommand>("Register", "ScopeName", f)->Execute();  
+// t.Resolve<iCommand>("Register", "ScopeName", "get int for me", generateInt)->Execute();  
+// If the first parameter is not "Register", the function looks for a factory method by scope  
+// and object name. The following parameters are passed to the factory method. Example:  
+// auto objPointer = t.Resolve<ObjType>("ScopeName", "get int for me", 42, "example");  
+// Invalid parameters (e.g., registering a non-factory or non-factory method) will throw an exception.  
+// If no factory method is found for the given parameters, an exception is also thrown.  
 
 class cIoC
 {
@@ -167,10 +173,7 @@ protected:
   }
 
   template<>
-  iCommand* doRegisterFactory(const std::string& scope, const cFactory &f)
-  {
-    return new iRegisterFactory(*this, scope, f);
-  }
+  iCommand* doRegisterFactory(const std::string& scope, const cFactory& f);
 
   template< typename T, typename... Args>
   T* doResolve(const std::string s1, const std::string s2, Args... args)
@@ -222,6 +225,13 @@ public:
   }
 
 };
+
+template<>
+inline iCommand* cIoC::doRegisterFactory(const std::string& scope, const cFactory& f)
+{
+  return new iRegisterFactory(*this, scope, f);
+}
+
 
 inline iRegisterFactory::iRegisterFactory(cIoC& ioc, const std::string& scope, const cFactory& f) : ioc(&ioc), scope(scope), f(new cFactory(f)) {}
 
